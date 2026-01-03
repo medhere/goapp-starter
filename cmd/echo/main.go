@@ -6,20 +6,20 @@ import (
 	"net/http"
 
 	"github.com/labstack/echo/v4"
-	"github.com/labstack/echo/v4/middleware"
 	// "golang.org/x/time/rate"
 )
 
 func main() {
-	// config.ConnectDB()
-	// config.MigrateDB()
 
 	//Echo
 	e := echo.New()
+	// config.ConnectDB()
+	// config.MigrateDB()
+
 	// e.Use(middleware.Recover())
 	// e.Use(middleware.BodyLimit("2M"))
 	// e.Use(middleware.Decompress())
-	e.Use(middleware.Gzip())
+	// e.Use(middleware.Gzip())
 	// e.Use(middleware.LoggerWithConfig(middleware.LoggerConfig{
 	// 	Format: "method=${method}, uri=${uri}, status=${status}\n error=${error}\n query=${query}\n form=${form}\n",
 	// }))
@@ -40,6 +40,6 @@ func main() {
 
 	// Start server
 	// echorouter.ListRoutesOnConsole(e)
-	e.Logger.Fatal(e.Start(config.Env("APP_HOST") + ":" + config.Env("APP_ECHO_PORT")))
+	e.Logger.Fatal(e.Start(config.Env("APP_HOST", "0.0.0.0") + ":" + config.Env("APP_ECHO_PORT", "8080")))
 
 }

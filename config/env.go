@@ -7,12 +7,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
-// Config func to get env value
-func Env(key string) string {
-	// load .env file
+func Env(key string, defaultValue string) string {
 	err := godotenv.Load(".env")
 	if err != nil {
-		fmt.Print("Error loading .env file")
+		fmt.Printf("Warning: Error loading .env file: %v\n", err)
 	}
-	return os.Getenv(key)
+
+	value := os.Getenv(key)
+
+	if value == "" {
+		return defaultValue
+	}
+
+	return value
 }

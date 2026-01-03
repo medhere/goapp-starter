@@ -32,7 +32,7 @@ type User struct {
 
 	// Authentication Credentials
 	Roles    *datatypes.JSON // Stores multiroles
-	Password string          // Stores the hashed password
+	Password *string         // Stores the hashed password
 	Active   bool            // Stores the active status
 
 	// Verification Status (Email)
@@ -41,13 +41,13 @@ type User struct {
 	EmailVerifyCodeExpiresAt *time.Time
 
 	// Verification Status (Phone)
-	PhoneVerified            bool
+	PhoneVerified            *bool
 	PhoneVerifyCodeHash      *string
 	PhoneVerifyCodeExpiresAt *time.Time
 
 	// OTP Fields
 	OTPCodeHash  *string
-	OTPChannel   *string `gorm:"size:50"` // (email | sms | whatsapp)
+	OTPChannel   *string // (email | sms | whatsapp)
 	OTPExpiresAt *time.Time
 
 	// Magic Link Fields
@@ -55,17 +55,17 @@ type User struct {
 	MagicLinkExpiresAt *time.Time
 
 	// Passkeys/WebAuthn Credentials
-	Passkeys datatypes.JSON // Stores public_key and sign_count (JSON format)
+	Passkeys *datatypes.JSON // Stores public_key and sign_count (JSON format)
 
 	//Security Questions
 	SecurityQuestion *string
 	SecurityAnswer   *string
 
 	// Login Metadata
-	SigninFlow   datatypes.JSON //can select one or more signin flows (email/phone and (password, magic_link, otp, passkey, security_question))
+	SigninFlow   *datatypes.JSON //can select one or more signin flows (email/phone and (password, magic_link, otp, passkey, security_question))
 	LastLoginAt  *time.Time
-	LoginCount   int `gorm:"default:0"` // Use int for login_count
-	FailedLogins int `gorm:"default:0"`
+	LoginCount   *int `gorm:"default:0"` // Use int for login_count
+	FailedLogins *int `gorm:"default:0"`
 	LockedUntil  *time.Time
 
 	// Soft Delete

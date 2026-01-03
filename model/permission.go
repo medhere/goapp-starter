@@ -7,13 +7,13 @@ import (
 
 type Permission struct {
 	gorm.Model
-	Scope     string `gorm:"type:enum('backend','frontend');not null"`
-	TargetApp string `gorm:"type:enum('dashboard','client');not null"`
+	Scope     string
+	TargetApp string
 
-	Category    string `gorm:"size:100;not null"`
-	SubCategory string `gorm:"size:100"`
+	Category    string
+	SubCategory string
 
-	PermissionName string `gorm:"size:100;uniqueIndex;not null"`
+	PermissionName string
 
-	AssignableRoles datatypes.JSON `gorm:"type:json;not null"` // JSON array of role names
+	AssignableRoles datatypes.JSON // JSON array of role names
 }
