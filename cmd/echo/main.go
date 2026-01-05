@@ -40,6 +40,7 @@ func main() {
 
 	// Start server
 	// echorouter.ListRoutesOnConsole(e)
+
 	e.Logger.Fatal(e.Start(config.Env("APP_HOST", "0.0.0.0") + ":" + config.Env("APP_ECHO_PORT", "8080")))
 
 }
