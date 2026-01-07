@@ -2,7 +2,7 @@ package controllers
 
 import (
 	"fmt"
-	"goapp/config"
+	"goapp/database"
 	"goapp/model"
 	"goapp/utils"
 	"log"
@@ -42,7 +42,7 @@ func EchoSignup(c echo.Context) error {
 	}
 
 	var existingUser model.User
-	if err := config.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
+	if err := database.DB.Where("email = ?", req.Email).First(&existingUser).Error; err == nil {
 		return c.JSON(http.StatusConflict, echo.Map{
 			"message": "Email already registered",
 		})
@@ -79,7 +79,7 @@ func EchoSignup(c echo.Context) error {
 		EmailVerifyCodeExpiresAt: &expiresAt,
 	}
 
-	if err := config.DB.Create(&newUser).Error; err != nil {
+	if err := database.DB.Create(&newUser).Error; err != nil {
 		return c.JSON(http.StatusInternalServerError, echo.Map{
 			"message": "Failed to create user",
 		})

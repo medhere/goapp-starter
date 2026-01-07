@@ -14,6 +14,6 @@ func HashString(toHash string, cost int) (string, error) {
 
 // CheckHash compares a plain text string with a hashed string.
 // Returns nil on success, or an error on failure (e.g., mismatch or invalid hash).
-func CheckHash(toCheck, hashString string) error {
+func CheckHash(toCheck string, hashString string) error {
 	return bcrypt.CompareHashAndPassword([]byte(hashString), []byte(toCheck))
 }

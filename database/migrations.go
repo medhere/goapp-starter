@@ -1,8 +1,7 @@
-package config
+package database
 
 import (
 	"fmt"
-
 	"goapp/model"
 )
 
@@ -13,6 +12,7 @@ func MigrateDB() {
 		&model.Role{},
 		&model.Permission{},
 		&model.UserPermission{},
+		&model.JWTAuthToken{},
 	)
 	fmt.Println("Database Migrated")
 

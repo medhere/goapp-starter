@@ -3,21 +3,19 @@ package utils
 import (
 	"errors"
 	"goapp/config"
+	"goapp/database"
 	"goapp/model"
-	"net/http"
 	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	echojwt "github.com/labstack/echo-jwt/v4"
-	"github.com/labstack/echo/v4"
 	"gorm.io/gorm"
 
 	jwtware "github.com/gofiber/contrib/v3/jwt"
 	"github.com/gofiber/fiber/v3"
 )
 
-var db = config.DB
+var CONN = database.DB
 
 var accessSecret = config.Env("JWT_SIGNING_KEY", "secret")
 var refreshSecret = config.Env("REFRESH_TOKEN_KEY", "refresh-secret")
@@ -29,29 +27,7 @@ func hashToken(t string) string {
 }
 
 // --- JWT Middleware Setup ---
-func EchoJWTAuthMiddlewareConfig() echojwt.Config {
-	return echojwt.Config{
-		NewClaimsFunc: func(c echo.Context) jwt.Claims {
-			return &struct {
-				UserID string
-				jwt.RegisteredClaims
-			}{}
-		},
-		SigningKey: []byte(config.Env("JWT_SIGNING_KEY", "secret")),
-		// TokenLookup: "header:Authorization:Bearer ",
-		ErrorHandler: func(c echo.Context, err error) error {
-			return echo.NewHTTPError(http.StatusUnauthorized, "Invalid or expired access token")
-		},
-	}
-}
-
-// Retrieve in Echo handler
-// user := c.Get("user").(*jwt.Token)
-// claims := user.Claims.(*AccessClaims)
-// userID := claims.UID
-
-// --- JWT Middleware Setup ---
-func FiberJWTAuthMiddlewareConfig() fiber.Handler {
+func JWTAuthMiddlewareConfig() fiber.Handler {
 	return jwtware.New(jwtware.Config{
 		SigningKey: jwtware.SigningKey{Key: []byte(config.Env("JWT_SIGNING_KEY", "secret"))},
 		ErrorHandler: func(c fiber.Ctx, err error) error {
@@ -72,7 +48,58 @@ func FiberJWTAuthMiddlewareConfig() fiber.Handler {
 
 // CreateAccessAndRefreshToken generates a new access token and either
 // inserts or updates a refresh token row for a given user/device.
-func CreateAccessAndRefreshToken(uid int, deviceID string) (accessToken string, refreshToken string, err error) {
+// func CreateAccessAndRefreshToken(uid int, deviceID string) (accessToken string, refreshToken string, err error) {
+// 	now := time.Now()
+// 	accessExp := now.Add(accessTokenDuration)
+// 	refreshExp := now.Add(refreshTokenDuration)
+
+// 	// Create access token
+// 	accessClaims := jwt.MapClaims{
+// 		"uid": uid,
+// 		"exp": accessExp.Unix(),
+// 	}
+// 	accessToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, accessClaims).SignedString(accessSecret)
+// 	if err != nil {
+// 		return "", "", err
+// 	}
+
+// 	// Create refresh token
+// 	refreshClaims := jwt.MapClaims{
+// 		"uid": uid,
+// 		"exp": refreshExp.Unix(),
+// 	}
+// 	refreshToken, err = jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString(refreshSecret)
+// 	if err != nil {
+// 		return "", "", err
+// 	}
+
+// 	// Check if a refresh token already exists for this user/device
+// 	var authToken model.JWTAuthToken
+// 	if err := CONN.Where("user_id = ? AND device_id = ?", uid, deviceID).First(&authToken).Error; err != nil {
+// 		if errors.Is(err, gorm.ErrRecordNotFound) {
+// 			// Insert new row
+// 			CONN.Create(&model.JWTAuthToken{
+// 				UserID:    uid,
+// 				DeviceID:  deviceID,
+// 				TokenHash: hashToken(refreshToken),
+// 				ExpiresAt: refreshExp,
+// 			})
+// 		} else {
+// 			return "", "", err
+// 		}
+// 	} else {
+// 		// Update existing row
+// 		authToken.TokenHash = hashToken(refreshToken)
+// 		authToken.ExpiresAt = refreshExp
+// 		authToken.RevokedAt = nil
+// 		CONN.Save(&authToken)
+// 	}
+
+// 	return accessToken, refreshToken, nil
+// }
+
+// CreateAccessAndRefreshToken encapsulates the JWT creation and storage logic
+func CreateAccessAndRefreshToken(uid uint, deviceID string, deviceName string) (accessToken string, refreshToken string, err error) {
 	now := time.Now()
 	accessExp := now.Add(accessTokenDuration)
 	refreshExp := now.Add(refreshTokenDuration)
@@ -97,26 +124,37 @@ func CreateAccessAndRefreshToken(uid int, deviceID string) (accessToken string, 
 		return "", "", err
 	}
 
+	// Hash the refresh token for secure storage
+	refreshTokenHash, hashErr := HashString(refreshToken, 4)
+	if hashErr != nil {
+		return "", "", hashErr
+	}
+
 	// Check if a refresh token already exists for this user/device
 	var authToken model.JWTAuthToken
-	if err := db.Where("user_id = ? AND device_id = ?", uid, deviceID).First(&authToken).Error; err != nil {
+	if err := CONN.Where("user_id = ? AND device_id = ?", uid, deviceID).First(&authToken).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			// Insert new row
-			db.Create(&model.JWTAuthToken{
-				UserID:    uid,
-				DeviceID:  deviceID,
-				TokenHash: hashToken(refreshToken),
-				ExpiresAt: refreshExp,
-			})
+			if err := CONN.Create(&model.JWTAuthToken{
+				UserID:     int(uid),
+				DeviceID:   deviceID,
+				DeviceName: &deviceName,
+				TokenHash:  refreshTokenHash,
+				ExpiresAt:  refreshExp,
+			}).Error; err != nil {
+				return "", "", err
+			}
 		} else {
 			return "", "", err
 		}
 	} else {
-		// Update existing row
-		authToken.TokenHash = hashToken(refreshToken)
+		// if avaialble, Update existing row
+		authToken.TokenHash = refreshTokenHash
 		authToken.ExpiresAt = refreshExp
 		authToken.RevokedAt = nil
-		db.Save(&authToken)
+		if err := CONN.Save(&authToken).Error; err != nil {
+			return "", "", err
+		}
 	}
 
 	return accessToken, refreshToken, nil
@@ -153,9 +191,9 @@ func VerifyRefreshToken(refreshToken string, deviceID string) (string, string, e
 	exp := time.Unix(int64(claims["exp"].(float64)), 0)
 	userID := int(claims["uid"].(float64))
 
-	// Find the token in db
+	// Find the token in CONN
 	var authToken model.JWTAuthToken
-	if err := db.Where("token_hash = ? AND device_id = ?", hashToken(refreshToken), deviceID).First(&authToken).Error; err != nil {
+	if err := CONN.Where("token_hash = ? AND device_id = ?", hashToken(refreshToken), deviceID).First(&authToken).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return "", "", errors.New("REFRESH_NOT_FOUND")
 		}
@@ -164,7 +202,7 @@ func VerifyRefreshToken(refreshToken string, deviceID string) (string, string, e
 
 	// Check if revoked or expired
 	if authToken.RevokedAt != nil || time.Now().After(exp) {
-		db.Delete(&authToken)
+		CONN.Delete(&authToken)
 		return "", "", errors.New("REFRESH_EXPIRED")
 	}
 
@@ -189,7 +227,7 @@ func VerifyRefreshToken(refreshToken string, deviceID string) (string, string, e
 	}
 
 	authToken.TokenHash = hashToken(newRefresh)
-	db.Save(&authToken)
+	CONN.Save(&authToken)
 
 	return accessToken, newRefresh, nil
 }
